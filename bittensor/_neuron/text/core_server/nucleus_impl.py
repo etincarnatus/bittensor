@@ -62,6 +62,7 @@ class server(torch.nn.Module):
         self.model_name = model_name if model_name != None else config.neuron.model_name
         self.pretrained = pretrained if pretrained != None else config.neuron.pretrained
         self.load_in_8bit = config.neuron.load_in_8bit
+        self.max_seq_length = config.neuron.max_seq_length
         if self.pretrained == True:
             if model != None:
                 self.pre_model = model
@@ -433,6 +434,9 @@ class server(torch.nn.Module):
         if std_tokenizer is None:
             std_tokenizer = self.std_tokenizer
 
+        if self.max_seq_length is not None:
+            token_batch = token_batch[:,-int(self.max_seq_length):]
+            
         # remap to server tokenizer, expect right-aligned sequences so that last position keeps continuation prediction
         tokens = self.token_remap(token_batch, std_tokenizer)
 
@@ -529,6 +533,7 @@ class server(torch.nn.Module):
         parser.add_argument('--neuron.device', type=str, help='miner default training device cpu/cuda', default=("cuda" if torch.cuda.is_available() else "cpu"))
         parser.add_argument('--neuron.model_name', type=str, help='pretrained model from hugging face',default='gpt2')
         parser.add_argument('--neuron.load_in_8bit', type=str, help='Load the model in int8 (requires tranformers>4.22)')
+        parser.add_argument('--neuron.max_seq_length', help='Maximum input sequence length with left truncation (forward_causallmnext)', default=None)
         parser.add_argument('--neuron.pretrained', action='store_false', help='if the model should be pretrained',default=True)
         parser.add_argument('--neuron.padding', action='store_false', help='To pad out final dimensions',default=True)
         parser.add_argument('--neuron.interpolate', action='store_false', help='To interpolate between sentence length',default=True)
