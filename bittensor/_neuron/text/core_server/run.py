@@ -45,7 +45,8 @@ def serve(
         metagraph = None,
     ):
     config.to_defaults()
-    model= model.to(model.device)
+    if not config.neuron.load_in_8bit:
+        model= model.to(model.device)
 
     # Create Subtensor connection
     subtensor = bittensor.subtensor(config = config) if subtensor == None else subtensor
@@ -97,7 +98,9 @@ def serve(
         return priority
 
     def forward_generate( inputs_x:torch.FloatTensor, synapse, model_output = None):
-        tokens = model.token_remap(inputs_x.to(model.device))
+        if config.neuron.load_in_8bit:
+            inputs_x = inputs_x.to(model.device)
+        tokens = model.token_remap(inputs_x)
         output = model.pre_model.generate(
             input_ids=tokens['input_ids'],
             attention_mask=tokens['attention_mask'],
@@ -121,17 +124,24 @@ def serve(
 
     def forward_hidden_state(inputs_x:torch.FloatTensor, synapse, model_output = None):
         with mutex:
-            message, model_output, hidden = model.encode_forward(inputs_x.to(model.device), model_output=model_output)
+            if config.neuron.load_in_8bit:
+                inputs_x = inputs_x.to(model.device)
+            if not config.
+            message, model_output, hidden = model.encode_forward(inputs_x, model_output=model_output)
         return message, model_output, hidden
 
     def forward_casual_lm(inputs_x:torch.FloatTensor, synapse, model_output = None):
         with mutex:
-            message, model_output, logits = model.encode_forward_causallm(inputs_x.to(model.device), model_output=model_output)
+            if config.neuron.load_in_8bit:
+                inputs_x = inputs_x.to(model.device)
+            message, model_output, logits = model.encode_forward_causallm(inputs_x, model_output=model_output)
         return message, model_output, logits
 
     def forward_casual_lm_next(inputs_x: torch.FloatTensor, synapse, model_output=None):
         with mutex:
-            message, model_output, topk_token_phrases = model.encode_forward_causallmnext(inputs_x.to(model.device),
+            if config.neuron.load_in_8bit:
+                inputs_x = inputs_x.to(model.device)
+            message, model_output, topk_token_phrases = model.encode_forward_causallmnext(inputs_x,
                                                                                         topk=synapse.topk,
                                                                                         model_output=model_output)
         # topk_token_phrases: [sum_b(sum_k(len(phrase_k) + 1)_b)] contains topk token phrases and probabilities
@@ -347,7 +357,10 @@ def serve(
             # --- Training step.
             while end_block >= current_block:
                 if current_block != subtensor.get_current_block():
-                    loss, _ = model( next( dataset ).to(model.device) )
+                    if config.neuron.load_in_8bit:
+                        loss, _ = model( next( dataset ) )
+                    else:
+                        loss, _ = model( next( dataset ).to(model.device) )
                     if iteration > 0 : 
                         losses += loss
                     else:
