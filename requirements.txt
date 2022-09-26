@@ -39,7 +39,9 @@ scalecodec>=1.0.35
 sentencepiece
 termcolor
 torch>=1.11
-transformers>=4.20.1
+transformers>=4.22.0
+bitsandbytes
+accelerate
 numpy
 wheel
 codecov
