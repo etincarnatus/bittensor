@@ -126,7 +126,6 @@ def serve(
         with mutex:
             if config.neuron.load_in_8bit:
                 inputs_x = inputs_x.to(model.device)
-            if not config.
             message, model_output, hidden = model.encode_forward(inputs_x, model_output=model_output)
         return message, model_output, hidden
 
