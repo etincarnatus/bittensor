@@ -21,6 +21,7 @@ import bittensor
 import argparse
 import pytest
 
+bittensor.logging(debug = True)
 
 def test_loaded_config():
     with pytest.raises(NotImplementedError):

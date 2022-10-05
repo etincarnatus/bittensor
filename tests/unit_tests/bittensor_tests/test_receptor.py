@@ -24,7 +24,8 @@ import unittest.mock as mock
 import asyncio
 from types import SimpleNamespace
 import time as clock
-from bittensor.utils.test_utils import get_random_unused_port
+
+logging = bittensor.logging(debug = True)
 
 wallet = bittensor.wallet.mock()
 
@@ -428,9 +429,8 @@ def test_axon_receptor_connection_forward_works():
     def forward_casual_lm_next(input, synapse, model_output=None):
         return None, None, torch.zeros([3, (synapse.topk + 1), 1 + 1])
 
-    port = get_random_unused_port()
     axon = bittensor.axon (
-        port = port,
+        port = 8081,
         ip = '127.0.0.1',
         wallet = wallet,
     )
@@ -445,7 +445,7 @@ def test_axon_receptor_connection_forward_works():
         uid = 0,
         ip = '127.0.0.1',
         ip_type = 4,
-        port = port,
+        port = 8081,
         hotkey = wallet.hotkey.ss58_address,
         coldkey = wallet.coldkey.ss58_address,
         modality = 2
@@ -612,9 +612,8 @@ def test_axon_receptor_connection_backward_unauthenticated():
 ## --unimplemented error 
 
 def test_axon_receptor_connection_forward_unimplemented():
-    port = get_random_unused_port()
     axon = bittensor.axon (
-        port = port,
+        port = 8091,
         ip = '127.0.0.1',
         wallet = wallet,
     )
@@ -625,7 +624,7 @@ def test_axon_receptor_connection_forward_unimplemented():
         uid = 0,
         ip = '127.0.0.1',
         ip_type = 4,
-        port = port,
+        port = 8091,
         hotkey = wallet.hotkey.ss58_address,
         coldkey = wallet.coldkey.ss58_address,
         modality = 2

@@ -2,7 +2,6 @@
 """
 # The MIT License (MIT)
 # Copyright © 2021 Yuma Rao
-# Copyright © 2022 Opentensor Foundation
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation 
@@ -45,8 +44,6 @@ class Axon( bittensor.grpc.BittensorServicer ):
         wallet: 'bittensor.wallet',
         ip: str,
         port: int,
-        external_ip: str,
-        external_port: int,
         server: 'grpc._Server',
         forward: 'Callable',
         backward: 'Callable',
@@ -78,8 +75,6 @@ class Axon( bittensor.grpc.BittensorServicer ):
         """
         self.ip = ip
         self.port = port
-        self.external_ip = external_ip
-        self.external_port = external_port
         self.wallet = wallet
         self.server = server
         self.forward_callback = forward if forward != None else self.default_forward_callback

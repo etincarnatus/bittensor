@@ -20,7 +20,6 @@ import torch
 import pytest
 import bittensor
 from bittensor._proto.bittensor_pb2 import UnknownException
-from bittensor.utils.test_utils import get_random_unused_port
 from . import constant
 
 wallet = bittensor.wallet.mock()
@@ -276,9 +275,8 @@ def test_successful_synapse():
     def forward_casual_lm_next(inputs_x, synapse, model_output=None):
         return None, None, synapse.nill_forward_response_tensor(inputs_x)
 
-    port = get_random_unused_port()
     axon = bittensor.axon (
-        port = port,
+        port = 8096,
         ip = '0.0.0.0',
         wallet = wallet,
     )
@@ -295,7 +293,7 @@ def test_successful_synapse():
         hotkey = wallet.hotkey.ss58_address,
         ip = '0.0.0.0', 
         ip_type = 4, 
-        port = port, 
+        port = 8096, 
         modality = 0, 
         coldkey = wallet.coldkeypub.ss58_address
     )
@@ -325,9 +323,8 @@ def test_failing_synapse():
     def forward_casual_lm_next(inputs_x, synapse, model_output=None):
         return None, None, synapse.nill_forward_response_tensor(inputs_x)
 
-    port = get_random_unused_port()
     axon = bittensor.axon (
-        port = port,
+        port = 8097,
         ip = '0.0.0.0',
         wallet = wallet,
     )
@@ -344,7 +341,7 @@ def test_failing_synapse():
         hotkey = wallet.hotkey.ss58_address,
         ip = '0.0.0.0', 
         ip_type = 4, 
-        port = port, 
+        port = 8097, 
         modality = 0, 
         coldkey = wallet.coldkeypub.ss58_address
     )
@@ -385,9 +382,8 @@ def test_missing_synapse():
     def forward_casual_lm_next(inputs_x, synapse, model_output=None):
         return None, None, synapse.nill_forward_response_tensor(inputs_x)
 
-    port = get_random_unused_port()
     axon = bittensor.axon (
-        port = port,
+        port = 8098,
         ip = '0.0.0.0',
         wallet = wallet,
     )
@@ -400,7 +396,7 @@ def test_missing_synapse():
         hotkey = wallet.hotkey.ss58_address,
         ip = '0.0.0.0', 
         ip_type = 4, 
-        port = port, 
+        port = 8098, 
         modality = 0, 
         coldkey = wallet.coldkeypub.ss58_address
     )
@@ -444,9 +440,8 @@ def test_dendrite_timeout():
         time.sleep(3)
         return None, None, synapse.nill_forward_response_tensor(inputs_x)
 
-    port = get_random_unused_port()
     axon = bittensor.axon (
-        port = port,
+        port = 8098,
         ip = '0.0.0.0',
         wallet = wallet,
     )
@@ -459,7 +454,7 @@ def test_dendrite_timeout():
         hotkey = wallet.hotkey.ss58_address,
         ip = '0.0.0.0', 
         ip_type = 4, 
-        port = port, 
+        port = 8098, 
         modality = 0, 
         coldkey = wallet.coldkeypub.ss58_address
     )
@@ -486,4 +481,5 @@ def test_clear():
     dataset.close()
     
 if __name__ == "__main__":
+    bittensor.logging(debug = True)
     test_dendrite_timeout()
