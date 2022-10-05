@@ -214,9 +214,7 @@ class server(torch.nn.Module):
         to_text_batch, from_offsets_batch, to_offsets_batch, pad_offsets_batch = result
 
         tokens = self.tokenizer(to_text_batch, padding=True, truncation=True, return_tensors='pt',
-                                    add_special_tokens=False).to(self.device)  # assume tokenizer.padding_side = 'left'
-        # if not self.load_in_8bit:
-        #     tokens = tokens.to(self.device)
+                                add_special_tokens=False).to(self.device)  # assume tokenizer.padding_side = 'left'
 
         if return_offsets_mapping:  # get offsets_mapping in tokenization to delineate token segment positions
             server_tokens = self.tokenizer(to_text_batch, return_offsets_mapping=True, add_special_tokens=False)
