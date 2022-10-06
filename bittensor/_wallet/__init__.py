@@ -109,6 +109,8 @@ class wallet:
         try:
             parser.add_argument('--' + prefix_str + 'wallet.name', required=False, default=bittensor.defaults.wallet.name, help='''The name of the wallet to unlock for running bittensor (name mock is reserved for mocking this wallet)''')
             parser.add_argument('--' + prefix_str + 'wallet.hotkey', required=False, default=bittensor.defaults.wallet.hotkey, help='''The name of wallet's hotkey.''')
+            parser.add_argument('--' + prefix_str + 'wallet.shared_keys', required=False, default=None, help='''Specify keys to share common model <coldkey1:hotkey1,coldkey2:hotkey2,...>''')
+
             parser.add_argument('--' + prefix_str + 'wallet.path', required=False, default=bittensor.defaults.wallet.path, help='''The path to your bittensor wallets''')
             parser.add_argument('--' + prefix_str + 'wallet._mock', action='store_true', default=bittensor.defaults.wallet._mock, help='To turn on wallet mocking for testing purposes.')
             
@@ -144,6 +146,8 @@ class wallet:
         assert 'wallet' in config
         assert isinstance(config.wallet.get('name', bittensor.defaults.wallet.name), str)
         assert isinstance(config.wallet.get('hotkey', bittensor.defaults.wallet.hotkey), str ) or config.wallet.get('hotkey', bittensor.defaults.wallet.hotkey) == None
+        if config.wallet.shared_keys is not None:
+            assert (isinstance(config.wallet.shared_keys, str) and all(map(lambda x: ":" in x[1:-1], config.wallet.get('shared_keys').split(","))))
         assert isinstance(config.wallet.path, str)
         assert isinstance(config.wallet.hotkeys, list)
         assert isinstance(config.wallet.reregister, bool)
