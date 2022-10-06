@@ -27,6 +27,8 @@ import os
 
 from .nucleus_impl import server
 from .run import serve
+import copy
+import torch.multiprocessing as mp
 
 class neuron:
     r"""
@@ -106,8 +108,12 @@ class neuron:
             logging_dir = config.neuron.full_path,
         )
 
-        self.model = server(config = config)
-        self.config = config
+        mp.set_start_method('spawn', force=True)
+        self.model = server(config = config).to(config.neuron.device)
+        self.model.share_memory()
+
+        # self.config = config
+        self.shared_subconfigs = self.create_shared_subconfigs(config)
 
         self.subtensor = subtensor
         self.wallet = wallet
@@ -115,19 +121,42 @@ class neuron:
         self.metagraph = metagraph
 
     def run(self):
-        serve(
-            self.config,
-            self.model,
-            subtensor = self.subtensor,
-            wallet = self.wallet,
-            axon = self.axon,
-            metagraph= self.metagraph,
-        )
+        processes = []
+        for shared_subconfig in self.shared_subconfigs:
+            p = mp.Process(target=serve, args=(shared_subconfig,
+                                               self.model,
+                                               self.subtensor,
+                                               self.wallet,
+                                               self.axon,
+                                               self.metagraph
+                                              )
+                          )
+            p.start()
+            processes.append(p)
+        for p in processes:
+            p.join()
 
 
     @classmethod
     def config(cls):
         return server.config()
+
+    @staticmethod
+    def create_shared_subconfigs(config: 'bittensor.Config'):
+        if config.wallet.shared_keys is not None:
+            keylist = config.wallet.shared_keys.split(",")
+            portlist = map(int,config.axon.shared_ports.split(","))
+            shared_subconfigs = []
+            for key,port in zip(keylist,portlist):
+                coldkey,hotkey = key.split(":")
+                subconfig = copy.deepcopy(config)
+                subconfig.wallet.name = coldkey
+                subconfig.wallet.hotkey = hotkey
+                subconfig.axon.port = port
+                shared_subconfigs.append(subconfig)
+        else:
+            shared_subconfigs = [config]
+        return shared_subconfigs
 
     @staticmethod
     def check_config( config: 'bittensor.Config' ):

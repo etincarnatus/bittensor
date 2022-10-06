@@ -217,6 +217,8 @@ class axon:
                     help='''The port this axon endpoint is served on. i.e. 8091''', default = bittensor.defaults.axon.port)
             parser.add_argument('--' + prefix_str + 'axon.ip', type=str, 
                 help='''The local ip this axon binds to. ie. [::]''', default = bittensor.defaults.axon.ip)
+            parser.add_argument('--' + prefix_str + 'axon.shared_ports', type=str, required=False,
+                                help='''The external ports for a shared model formatted as <port1,port2,...> with wallet.shared_keys''', default = None)
             parser.add_argument('--' + prefix_str + 'axon.max_workers', type=int, 
                 help='''The maximum number connection handler threads working simultaneously on this endpoint. 
                         The grpc server distributes new worker threads to service requests up to this number.''', default = bittensor.defaults.axon.max_workers)
@@ -267,6 +269,10 @@ class axon:
         """ Check config for axon port and wallet
         """
         assert config.axon.port > 1024 and config.axon.port < 65535, 'port must be in range [1024, 65535]'
+        if (config.axon.shared_ports is not None) and (config.wallet.shared_keys is not None):
+            assert all(map(lambda x: x.isdigit(), config.axon.shared_ports.split(","))) and (len(config.axon.shared_ports.split(","))==len(config.wallet.shared_keys.split(",")))
+        else:
+            assert (config.axon.shared_ports is None) and (config.wallet.shared_keys is None)
         bittensor.wallet.check_config( config )
 
     @classmethod   
