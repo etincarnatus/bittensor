@@ -63,8 +63,7 @@ def serve(
             subtensor = subtensor
         )
     
-    metagraph.load().save()
-    # metagraph.sync().save()
+    metagraph.load().sync().save()
 
     # Create our optimizer.
     optimizer = torch.optim.SGD(
