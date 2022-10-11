@@ -63,12 +63,13 @@ class server(torch.nn.Module):
         self.model_name = model_name if model_name != None else config.neuron.model_name
         self.pretrained = pretrained if pretrained != None else config.neuron.pretrained
         self.load_in_8bit = config.neuron.load_in_8bit
+        self.max_seq_length = config.neuron.max_seq_length
         if self.pretrained == True:
             if model != None:
                 self.pre_model = model
             else:
                 if self.load_in_8bit == True:
-                    max_memory = {int(self.device[-1]): torch.cuda.get_device_properties(self.device).total_memory} # Load on specified device
+                    max_memory = {int(self.device.split(":")[-1]): torch.cuda.get_device_properties(self.device).total_memory} # Load on specified device
                     self.pre_model = AutoModelForCausalLM.from_pretrained(self.model_name, low_cpu_mem_usage=True, device_map="auto", load_in_8bit=True, max_memory=max_memory)
                 else:
                     self.pre_model = AutoModelForCausalLM.from_pretrained(self.model_name, low_cpu_mem_usage=True)
@@ -284,9 +285,17 @@ class server(torch.nn.Module):
                                                 output_hidden_states=True)
             else:
                 with torch.no_grad():
-                    model_output = self.pre_model(input_ids=tokens['input_ids'],
-                                                    attention_mask=tokens['attention_mask'],
-                                                    output_hidden_states=True)
+                    if self.max_seq_length is not None:
+                        output = [self.pre_model(input_ids=tokens['input_ids'][:,i:i+int(self.max_seq_length)], 
+                                        attention_mask=tokens['attention_mask'][:,i:i+int(self.max_seq_length)], 
+                                        output_hidden_states=True) \
+                                  for i in range(0,tokens['input_ids'].shape[1],int(self.max_seq_length))]
+                        model_output = output[-1]
+                        model_output.logits = torch.concat(list(map(lambda x: x.logits,output)),axis=1)
+                    else:
+                        model_output = self.pre_model(input_ids=tokens['input_ids'],
+                                                        attention_mask=tokens['attention_mask'],
+                                                        output_hidden_states=True)
 
         return None, model_output, model_output.logits
     
@@ -322,9 +331,18 @@ class server(torch.nn.Module):
                                                 output_hidden_states=True)
             else:
                 with torch.no_grad():
-                    model_output = self.pre_model(input_ids=tokens['input_ids'],
-                                                    attention_mask=tokens['attention_mask'],
-                                                    output_hidden_states=True)
+                    if self.max_seq_length is not None:
+                        output = [self.pre_model(input_ids=tokens['input_ids'][:,i:i+int(self.max_seq_length)], 
+                                        attention_mask=tokens['attention_mask'][:,i:i+int(self.max_seq_length)], 
+                                        output_hidden_states=True) \
+                                  for i in range(0,tokens['input_ids'].shape[1],int(self.max_seq_length))]
+                        model_output = output[-1]
+                        model_output.hidden_states = tuple(torch.concat([out.hidden_states[i] for out in output],axis=1) \
+                                                           for i in range(len(model_output.hidden_states)))
+                    else:
+                        model_output = self.pre_model(input_ids=tokens['input_ids'],
+                                                        attention_mask=tokens['attention_mask'],
+                                                        output_hidden_states=True)
 
         pre_hidden = model_output.hidden_states[-1]
 
@@ -374,9 +392,17 @@ class server(torch.nn.Module):
         def _forward(_model_output=model_output):
             if _model_output is None:
                 # transformer models like gerpt2 typically perform worse with left-side attention mask, so turning it off
-                _model_output = self.pre_model(input_ids=tokens['input_ids'],
-                                                #attention_mask=tokens['attention_mask'],
-                                               output_hidden_states=True)
+                if self.max_seq_length is not None:
+                    output = [self.pre_model(input_ids=tokens['input_ids'][:,i:i+int(self.max_seq_length)], 
+                                    #attention_mask=tokens['attention_mask'][:,i:i+int(self.max_seq_length)], 
+                                    output_hidden_states=True) \
+                              for i in range(0,tokens['input_ids'].shape[1],int(self.max_seq_length))]
+                    _model_output = output[-1]
+                    _model_output.logits = torch.concat(list(map(lambda x: x.logits,output)),axis=1)
+                else:
+                    _model_output = self.pre_model(input_ids=tokens['input_ids'],
+                                                    #attention_mask=tokens['attention_mask'],
+                                                   output_hidden_states=True)
             pre_logits = _model_output.logits  # [batch_size, sequence_len, self.tokenizer.vocab_len]
 
             probs_std = translate_logits_to_probs_std(pre_logits,
@@ -441,14 +467,18 @@ class server(torch.nn.Module):
         
         if std_tokenizer is None:
             std_tokenizer = self.std_tokenizer
-
         tokens = self.token_remap(token_batch, std_tokenizer)
 
         def _forward(_model_output=model_output):
             if _model_output is None:
-                _model_output = self.pre_model(input_ids=tokens['input_ids'],
-                                               attention_mask=tokens['attention_mask'],
-                                               output_hidden_states=True)
+                if self.max_seq_length is not None:
+                    _model_output = self.pre_model(input_ids=tokens['input_ids'][:,-int(self.max_seq_length):],
+                                                   attention_mask=tokens['attention_mask'][:,-int(self.max_seq_length):],
+                                                   output_hidden_states=True)
+                else:
+                    _model_output = self.pre_model(input_ids=tokens['input_ids'],
+                                                   attention_mask=tokens['attention_mask'],
+                                                   output_hidden_states=True)
 
             # model_output.logits: [batch_size, sequence_len, server_vocab_size]
             last_logits = _model_output.logits[:, -1, :]  # [batch_size] server prediction of continuation, right-aligned
@@ -457,7 +487,7 @@ class server(torch.nn.Module):
             # then compact new token phrases and probabilities into 1-D tensor
             topk_tensor = topk_token_phrases(last_logits, self.tokenizer, topk=topk)  # [batch_size, (topk + 1), max_len]
 
-            original_loss = self.get_loss_fct(_model_output.logits, tokens['input_ids']).item()
+            original_loss = self.get_loss_fct(_model_output.logits, tokens['input_ids'][:,-int(self.max_seq_length):]).item()
             message = f'Loss: {original_loss:.2f}'
 
             _model_output.loss = original_loss
@@ -539,6 +569,7 @@ class server(torch.nn.Module):
         parser.add_argument('--neuron.device', type=str, help='miner default training device cpu/cuda', default=("cuda" if torch.cuda.is_available() else "cpu"))
         parser.add_argument('--neuron.model_name', type=str, help='pretrained model from hugging face',default='gpt2')
         parser.add_argument('--neuron.load_in_8bit', action='store_true', help='Load the model in int8 (requires tranformers>4.22)', default=False)
+        parser.add_argument('--neuron.max_seq_length', type=int, help='Maximum input sequence length with left truncation', default=None)
         parser.add_argument('--neuron.pretrained', action='store_false', help='if the model should be pretrained',default=True)
         parser.add_argument('--neuron.padding', action='store_false', help='To pad out final dimensions',default=True)
         parser.add_argument('--neuron.interpolate', action='store_false', help='To interpolate between sentence length',default=True)
