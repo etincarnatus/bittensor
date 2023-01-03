@@ -35,7 +35,9 @@ scalecodec>=1.0.35,<1.1.0
 sentencepiece==0.1.97
 termcolor==2.1.1
 torch==1.12
-transformers==4.20.1
+transformers>=4.22.0
+bitsandbytes
+accelerate
 numpy==1.21.6
 wheel==0.37.1
 tqdm==4.64.1
