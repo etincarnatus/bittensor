@@ -48,7 +48,8 @@ def serve(
         metagraph = None,
     ):
     config.to_defaults()
-    model= model.to(model.device)
+    if not config.neuron.load_in_8bit:
+        model= model.to(model.device)
 
     # Create Subtensor connection
     subtensor = bittensor.subtensor(config = config) if subtensor == None else subtensor

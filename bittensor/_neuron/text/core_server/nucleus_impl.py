@@ -62,8 +62,15 @@ class server(torch.nn.Module):
         #setting up pretrained model
         self.model_name = model_name if model_name != None else config.neuron.model_name
         self.pretrained = pretrained if pretrained != None else config.neuron.pretrained
+        self.load_in_8bit = config.neuron.load_in_8bit
         if self.pretrained == True:
-            self.pre_model = model if model != None else AutoModelForCausalLM.from_pretrained(self.model_name)
+            if model != None:
+                self.pre_model = model
+            else:
+                if self.load_in_8bit == True:
+                    model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map="auto", load_in_8bit=True)
+                else:
+                    AutoModelForCausalLM.from_pretrained(self.model_name)
             self.tokenizer = tokenizer
             if tokenizer is None:
                 try:
@@ -209,7 +216,9 @@ class server(torch.nn.Module):
         to_text_batch, from_offsets_batch, to_offsets_batch, pad_offsets_batch = result
 
         tokens = self.tokenizer(to_text_batch, padding=True, truncation=True, max_length=token_batch.size(1), return_tensors='pt',
-                                add_special_tokens=False).to(self.device)  # assume tokenizer.padding_side = 'left'
+                                add_special_tokens=False)  # assume tokenizer.padding_side = 'left'
+        if not self.load_in_8bit:
+            tokens = tokens.to(self.device)
 
         if return_offsets_mapping:  # get offsets_mapping in tokenization to delineate token segment positions
             server_tokens = self.tokenizer(to_text_batch, return_offsets_mapping=True, add_special_tokens=False)
@@ -528,6 +537,7 @@ class server(torch.nn.Module):
         parser.add_argument('--neuron.clip_gradients', type=float, help='Implement gradient clipping to avoid exploding loss on smaller architectures.', default=1.0)
         parser.add_argument('--neuron.device', type=str, help='miner default training device cpu/cuda', default=("cuda" if torch.cuda.is_available() else "cpu"))
         parser.add_argument('--neuron.model_name', type=str, help='pretrained model from hugging face',default='gpt2')
+        parser.add_argument('--neuron.load_in_8bit', type=str, help='Load the model in int8 (requires tranformers>4.22)')
         parser.add_argument('--neuron.pretrained', action='store_false', help='if the model should be pretrained',default=True)
         parser.add_argument('--neuron.padding', action='store_false', help='To pad out final dimensions',default=True)
         parser.add_argument('--neuron.interpolate', action='store_false', help='To interpolate between sentence length',default=True)
