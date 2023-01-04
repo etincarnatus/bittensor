@@ -68,7 +68,8 @@ class server(torch.nn.Module):
                 self.pre_model = model
             else:
                 if self.load_in_8bit == True:
-                    self.pre_model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map="auto", load_in_8bit=True, low_cpu_mem_usage=True)
+                    max_memory = {int(self.device[-1]): torch.cuda.get_device_properties(self.device).total_memory} # Load on specified device
+                    self.pre_model = AutoModelForCausalLM.from_pretrained(self.model_name, low_cpu_mem_usage=True, device_map="auto", load_in_8bit=True, max_memory=max_memory)
                 else:
                     self.pre_model = AutoModelForCausalLM.from_pretrained(self.model_name, low_cpu_mem_usage=True)
             self.tokenizer = tokenizer
