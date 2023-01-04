@@ -68,9 +68,9 @@ class server(torch.nn.Module):
                 self.pre_model = model
             else:
                 if self.load_in_8bit == True:
-                    model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map="auto", load_in_8bit=True)
+                    model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map="auto", load_in_8bit=True, low_cpu_mem_usage=True)
                 else:
-                    AutoModelForCausalLM.from_pretrained(self.model_name)
+                    AutoModelForCausalLM.from_pretrained(self.model_name, low_cpu_mem_usage=True)
             self.tokenizer = tokenizer
             if tokenizer is None:
                 try:
