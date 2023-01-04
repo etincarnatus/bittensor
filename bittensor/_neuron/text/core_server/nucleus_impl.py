@@ -68,9 +68,9 @@ class server(torch.nn.Module):
                 self.pre_model = model
             else:
                 if self.load_in_8bit == True:
-                    model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map="auto", load_in_8bit=True, low_cpu_mem_usage=True)
+                    self.pre_model = AutoModelForCausalLM.from_pretrained(self.model_name, device_map="auto", load_in_8bit=True, low_cpu_mem_usage=True)
                 else:
-                    AutoModelForCausalLM.from_pretrained(self.model_name, low_cpu_mem_usage=True)
+                    self.pre_model = AutoModelForCausalLM.from_pretrained(self.model_name, low_cpu_mem_usage=True)
             self.tokenizer = tokenizer
             if tokenizer is None:
                 try:
@@ -537,7 +537,7 @@ class server(torch.nn.Module):
         parser.add_argument('--neuron.clip_gradients', type=float, help='Implement gradient clipping to avoid exploding loss on smaller architectures.', default=1.0)
         parser.add_argument('--neuron.device', type=str, help='miner default training device cpu/cuda', default=("cuda" if torch.cuda.is_available() else "cpu"))
         parser.add_argument('--neuron.model_name', type=str, help='pretrained model from hugging face',default='gpt2')
-        parser.add_argument('--neuron.load_in_8bit', type=str, help='Load the model in int8 (requires tranformers>4.22)')
+        parser.add_argument('--neuron.load_in_8bit', action='store_true', help='Load the model in int8 (requires tranformers>4.22)', default=False)
         parser.add_argument('--neuron.pretrained', action='store_false', help='if the model should be pretrained',default=True)
         parser.add_argument('--neuron.padding', action='store_false', help='To pad out final dimensions',default=True)
         parser.add_argument('--neuron.interpolate', action='store_false', help='To interpolate between sentence length',default=True)
