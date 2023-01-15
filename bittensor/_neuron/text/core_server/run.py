@@ -67,6 +67,7 @@ def serve(
         )
     
     metagraph.load().sync().save()
+    # metagraph.sync().save()
 
     # Create our optimizer.
     optimizer = torch.optim.SGD(

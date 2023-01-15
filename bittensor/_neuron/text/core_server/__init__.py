@@ -24,9 +24,39 @@ Example:
 
 import bittensor
 import os
+from time import sleep
+import traceback
 
 from .nucleus_impl import server
 from .run import serve
+import copy
+from torch import multiprocessing
+
+class Process(multiprocessing.Process):
+    """
+    Class which returns child Exceptions to Parent.
+    https://stackoverflow.com/a/33599967/4992248
+    """
+
+    def __init__(self, *args, **kwargs):
+        multiprocessing.Process.__init__(self, *args, **kwargs)
+        self._parent_conn, self._child_conn = multiprocessing.Pipe()
+        self._exception = None
+
+    def run(self):
+        try:
+            multiprocessing.Process.run(self)
+            self._child_conn.send(None)
+        except Exception as e:
+            tb = traceback.format_exc()
+            self._child_conn.send((e, tb))
+            # raise e  # You can still rise this exception if you need to
+
+    @property
+    def exception(self):
+        if self._parent_conn.poll():
+            self._exception = self._parent_conn.recv()
+        return self._exception
 
 class neuron:
     r"""
@@ -115,6 +145,7 @@ class neuron:
         self.model = server(config = config)
         self.config = config
         self.config.to_prometheus()
+        self.shared_subconfigs = self.create_shared_subconfigs(config)
 
         self.subtensor = subtensor
         self.wallet = wallet
@@ -122,19 +153,73 @@ class neuron:
         self.metagraph = metagraph
 
     def run(self):
-        serve(
-            self.config,
-            self.model,
-            subtensor = self.subtensor,
-            wallet = self.wallet,
-            axon = self.axon,
-            metagraph = self.metagraph,
-        )
+        if len(self.shared_subconfigs)==1:
+            serve(
+                self.config,
+                self.model,
+                subtensor = self.subtensor,
+                wallet = self.wallet,
+                axon = self.axon,
+                metagraph = self.metagraph
+                )
+        else:
+            multiprocessing.set_start_method('spawn', force=True)
+            self.model.to(self.config.neuron.device)
+            self.model.share_memory()
 
+            processes = {}
+            n = 0
+            for shared_subconfig in self.shared_subconfigs:
+                p = Process(target=serve, args=(shared_subconfig,
+                                                self.model,
+                                                self.subtensor,
+                                                self.wallet,
+                                                self.axon,
+                                                self.metagraph
+                                                )
+                              )
+                p.start()
+                processes[n] = (p, shared_subconfig)
+                n+=1
+            
+            while len(processes)>0:
+                for n in list(processes):
+                    (p, shared_subconfig) = processes[n]
+                    sleep(1)
+                    if not p.is_alive():
+                        if p.exitcode is None:
+                            for p_, task in processes.values(): # Terminate all child processes without waiting
+                                p_.terminate()
+                            raise ChildProcessError("Not started and not exited!")
+                        elif p.exception: # Exception in child process
+                            error, trace = p.exception
+                            for p_, task in processes.values(): # Terminate all child processes without waiting
+                                p_.terminate()
+                            raise ChildProcessError(trace)
+                        elif p.exitcode==0:
+                            p.join()
+                            del processes[n]
 
     @classmethod
     def config(cls):
         return server.config()
+
+    @staticmethod
+    def create_shared_subconfigs(config: 'bittensor.Config'):
+        if config.wallet.shared_keys is not None:
+            keylist = config.wallet.shared_keys.split(",")
+            portlist = map(int,config.axon.shared_ports.split(","))
+            shared_subconfigs = []
+            for key,port in zip(keylist,portlist):
+                coldkey,hotkey = key.split(":")
+                subconfig = copy.deepcopy(config)
+                subconfig.wallet.name = coldkey
+                subconfig.wallet.hotkey = hotkey
+                subconfig.axon.port = port
+                shared_subconfigs.append(subconfig)
+        else:
+            shared_subconfigs = [config]
+        return shared_subconfigs
 
     @staticmethod
     def check_config( config: 'bittensor.Config' ):

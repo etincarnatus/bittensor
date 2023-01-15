@@ -487,7 +487,10 @@ class server(torch.nn.Module):
             # then compact new token phrases and probabilities into 1-D tensor
             topk_tensor = topk_token_phrases(last_logits, self.tokenizer, topk=topk)  # [batch_size, (topk + 1), max_len]
 
-            original_loss = self.get_loss_fct(_model_output.logits, tokens['input_ids'][:,-int(self.max_seq_length):]).item()
+            if self.max_seq_length is not None:
+                original_loss = self.get_loss_fct(_model_output.logits, tokens['input_ids'][:,-int(self.max_seq_length):]).item()
+            else:
+                original_loss = self.get_loss_fct(_model_output.logits, tokens['input_ids']).item()
             message = f'Loss: {original_loss:.2f}'
 
             _model_output.loss = original_loss
